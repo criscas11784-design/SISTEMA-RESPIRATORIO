@@ -1,7 +1,7 @@
 {
   "name": "Sistema Respiratorio Interactivo",
   "short_name": "Respiratorio",
-  "description": "Recurso interactivo sobre el sistema respiratorio para Ciencia y Tecnología – Ciclo V CNEB",
+  "description": "Recurso interactivo Ciclo V CNEB",
   "start_url": "./indice.html",
   "display": "standalone",
   "background_color": "#F0F8FF",
