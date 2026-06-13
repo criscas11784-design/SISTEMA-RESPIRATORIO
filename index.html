@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Respiratorio Interactivo</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#003366">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Resp. Interactivo">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blue:#00B7D8;--dark:#003366;--green:#66BB6A;--orange:#FF9800;--purple:#8E44AD;
+    --red:#E74C3C;--bg:#F0F8FF;--white:#fff;--shadow:0 4px 20px rgba(0,51,102,.13);
+    --radius:16px;
+  }
+  body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh;overflow-x:hidden}
+  /* PROGRESS BAR */
+  #progress-bar-wrap{position:fixed;top:0;left:0;width:100%;z-index:999;background:rgba(255,255,255,.92);padding:8px 16px;box-shadow:0 2px 8px rgba(0,51,102,.1);display:flex;align-items:center;gap:12px}
+  #progress-label{font-weight:800;font-size:.78rem;color:var(--dark);white-space:nowrap;min-width:90px}
+  #progress-track{flex:1;height:10px;background:#dde8f5;border-radius:99px;overflow:hidden}
+  #progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:99px;transition:width .5s ease;width:0%}
+  #progress-score{font-weight:800;font-size:.78rem;color:var(--purple);white-space:nowrap;min-width:60px;text-align:right}
+  /* SCREENS */
+  .screen{display:none;min-height:100vh;padding:70px 16px 40px;max-width:780px;margin:0 auto}
+  .screen.active{display:block}
+  /* INTRO */
+  #screen-intro{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 16px 40px}
+  .intro-icon{font-size:5rem;margin-bottom:8px;animation:breathe 3s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .intro-title{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;color:var(--dark);line-height:1.1;margin-bottom:8px}
+  .intro-title span{color:var(--blue)}
+  .intro-sub{font-size:clamp(1rem,3vw,1.2rem);color:#555;max-width:500px;margin:0 auto 28px}
+  .intro-badge{display:inline-flex;align-items:center;gap:8px;background:var(--dark);color:#fff;padding:10px 22px;border-radius:99px;font-size:.9rem;font-weight:700;margin-bottom:32px}
+  .btn{display:inline-block;padding:14px 36px;border-radius:99px;font-family:'Nunito',sans-serif;font-weight:800;font-size:1.05rem;cursor:pointer;border:none;transition:transform .15s,box-shadow .15s;box-shadow:var(--shadow)}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,51,102,.18)}
+  .btn:active{transform:translateY(0)}
+  .btn-primary{background:linear-gradient(135deg,var(--blue),#0082a8);color:#fff}
+  .btn-success{background:linear-gradient(135deg,var(--green),#43a047);color:#fff}
+  .btn-orange{background:linear-gradient(135deg,var(--orange),#e65100);color:#fff}
+  .btn-purple{background:linear-gradient(135deg,var(--purple),#6c1f8c);color:#fff}
+  /* SECTION HEADER */
+  .section-header{text-align:center;margin-bottom:28px}
+  .section-number{display:inline-block;background:var(--dark);color:#fff;font-weight:900;font-size:.8rem;padding:4px 14px;border-radius:99px;margin-bottom:8px;letter-spacing:.05em}
+  .section-title{font-size:clamp(1.4rem,5vw,2rem);font-weight:900;color:var(--dark);margin-bottom:6px}
+  .section-desc{font-size:.95rem;color:#666;max-width:560px;margin:0 auto}
+  /* CARD */
+  .card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin-bottom:16px}
+  /* FILL BLANKS */
+  .fill-sentence{font-size:1rem;font-weight:600;color:var(--dark);line-height:1.8;margin-bottom:8px}
+  .fill-input{border:2.5px solid #b8d4ee;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.95rem;color:var(--dark);outline:none;width:160px;transition:border .2s}
+  .fill-input:focus{border-color:var(--blue)}
+  .fill-input.correct{border-color:var(--green);background:#f0fff0}
+  .fill-input.wrong{border-color:var(--red);background:#fff0f0}
+  .fill-feedback{font-size:.82rem;font-weight:700;margin-top:4px;min-height:18px}
+  .fill-feedback.ok{color:var(--green)}
+  .fill-feedback.no{color:var(--red)}
+  /* MATCH */
+  .match-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:500px){.match-grid{grid-template-columns:1fr}}
+  .match-row{display:contents}
+  .match-term{background:linear-gradient(135deg,var(--dark),#005599);color:#fff;border-radius:10px;padding:10px 14px;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:6px}
+  .match-select{border:2.5px solid #b8d4ee;border-radius:10px;padding:8px 10px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.88rem;color:var(--dark);background:#fff;width:100%;cursor:pointer;outline:none;transition:border .2s}
+  .match-select:focus{border-color:var(--blue)}
+  .match-select.correct{border-color:var(--green);background:#f0fff0}
+  .match-select.wrong{border-color:var(--red);background:#fff0f0}
+  /* TF */
+  .tf-statement{font-size:1rem;font-weight:600;color:var(--dark);margin-bottom:10px;line-height:1.5}
+  .tf-btns{display:flex;gap:10px;flex-wrap:wrap}
+  .tf-btn{padding:9px 22px;border-radius:99px;border:2.5px solid #dde8f5;background:#fff;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;cursor:pointer;transition:all .15s}
+  .tf-btn:hover{background:var(--bg)}
+  .tf-btn.sel-true{border-color:var(--green);background:#e8fce8;color:#2e7d32}
+  .tf-btn.sel-false{border-color:var(--red);background:#fce8e8;color:#b71c1c}
+  .tf-btn.correct{border-color:var(--green)!important;background:#c8f7c5!important}
+  .tf-btn.wrong{border-color:var(--red)!important;background:#fdd!important}
+  .tf-feedback{font-size:.82rem;font-weight:700;margin-top:6px;min-height:18px}
+  .tf-feedback.ok{color:var(--green)}
+  .tf-feedback.no{color:var(--red)}
+  /* MULTI */
+  .mc-question{font-size:1rem;font-weight:700;color:var(--dark);margin-bottom:12px;line-height:1.5}
+  .mc-options{display:flex;flex-direction:column;gap:8px}
+  .mc-opt{padding:10px 16px;border-radius:10px;border:2.5px solid #dde8f5;background:#fff;font-family:'Nunito',sans-serif;font-weight:600;font-size:.92rem;cursor:pointer;transition:all .15s;text-align:left}
+  .mc-opt:hover{border-color:var(--blue);background:#e8f7fc}
+  .mc-opt.selected{border-color:var(--blue);background:#cff0fa}
+  .mc-opt.correct{border-color:var(--green)!important;background:#c8f7c5!important;font-weight:800}
+  .mc-opt.wrong{border-color:var(--red)!important;background:#fdd!important}
+  .mc-feedback{font-size:.82rem;font-weight:700;margin-top:8px;min-height:18px}
+  .mc-feedback.ok{color:var(--green)}
+  .mc-feedback.no{color:var(--red)}
+  /* ORDER */
+  #order-container{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .order-item{background:var(--white);border:2.5px solid #b8d4ee;border-radius:12px;padding:12px 18px;font-weight:800;font-size:.95rem;cursor:grab;display:flex;align-items:center;gap:10px;transition:transform .15s,box-shadow .15s;user-select:none}
+  .order-item:active{cursor:grabbing}
+  .order-item.dragging{opacity:.4;transform:scale(.97)}
+  .order-item.drag-over{border-color:var(--orange);background:#fff8e1}
+  .order-num{width:28px;height:28px;border-radius:50%;background:var(--dark);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .order-emoji{font-size:1.3rem}
+  .order-feedback{text-align:center;font-weight:800;font-size:1.1rem;margin-top:10px;min-height:28px}
+  .order-feedback.ok{color:var(--green)}
+  .order-feedback.no{color:var(--red)}
+  /* CURIOSITIES */
+  .curio-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+  .curio-card{border-radius:var(--radius);padding:22px 18px;text-align:center;box-shadow:var(--shadow);animation:floatUp .6s ease both}
+  @keyframes floatUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .curio-card:nth-child(2){animation-delay:.15s}
+  .curio-card:nth-child(3){animation-delay:.3s}
+  .curio-icon{font-size:2.6rem;margin-bottom:10px;display:block}
+  .curio-number{font-size:2rem;font-weight:900;margin-bottom:4px}
+  .curio-text{font-size:.9rem;font-weight:600;color:#444;line-height:1.4}
+  .curio-1{background:linear-gradient(135deg,#e0f7ff,#b2ebf2);border:2px solid var(--blue)}
+  .curio-2{background:linear-gradient(135deg,#f3e5f5,#e1bee7);border:2px solid var(--purple)}
+  .curio-3{background:linear-gradient(135deg,#fff8e1,#ffe082);border:2px solid var(--orange)}
+  .curio-4{background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border:2px solid var(--green)}
+  /* RESULTS */
+  .result-circle{width:150px;height:150px;border-radius:50%;margin:0 auto 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 12px rgba(0,183,216,.15);font-size:2.8rem;font-weight:900}
+  .result-pct{font-size:1rem;font-weight:700;margin-top:-6px}
+  .result-bar-wrap{background:#dde8f5;border-radius:99px;height:18px;overflow:hidden;margin:16px 0 8px}
+  .result-bar{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.22,1,.36,1)}
+  .result-msg{font-size:1.3rem;font-weight:800;text-align:center;margin-bottom:8px}
+  .result-detail{font-size:.95rem;color:#666;text-align:center;margin-bottom:24px}
+  .result-badges{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px}
+  .result-badge{padding:8px 18px;border-radius:99px;font-weight:800;font-size:.9rem}
+  /* NAV */
+  .nav-row{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:24px}
+  /* UTILS */
+  .text-center{text-align:center}
+  .mt-16{margin-top:16px}
+  .mb-16{margin-bottom:16px}
+  hr.divider{border:none;border-top:2px solid #e0eef8;margin:20px 0}
+  .hint-chip{display:inline-flex;align-items:center;gap:6px;background:#fffde7;border:1.5px solid #ffe082;border-radius:99px;padding:5px 14px;font-size:.8rem;font-weight:700;color:#795548;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- PROGRESS BAR -->
+<div id="progress-bar-wrap">
+  <span id="progress-label">Actividad 1/7</span>
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <span id="progress-score">🏆 0 pts</span>
+</div>
+
+<!-- SCREEN 0: INTRO -->
+<div id="screen-intro" class="screen active">
+  <div class="intro-icon">🫁</div>
+  <div class="intro-title">Sistema<br><span>Respiratorio</span></div>
+  <p class="intro-sub">Aprendamos cómo funciona nuestro sistema respiratorio</p>
+  <div class="intro-badge">🎮 7 actividades interactivas</div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:32px">
+    <span style="background:#e0f7ff;border:1.5px solid var(--blue);border-radius:99px;padding:6px 14px;font-size:.82rem;font-weight:700;color:var(--dark)">✍️ Completa oraciones</span>
+    <span style="background:#f3e5f5;border:1.5px solid var(--purple);border-radius:99px;padding:6px 14px;font-size:.82rem;font-weight:700;color:var(--dark)">🔗 Relaciona columnas</span>
+    <span style="background:#fff8e1;border:1.5px solid var(--orange);border-radius:99px;padding:6px 14px;font-size:.82rem;font-weight:700;color:var(--dark)">✅ Verdadero/Falso</span>
+    <span style="background:#e8f5e9;border:1.5px solid var(--green);border-radius:99px;padding:6px 14px;font-size:.82rem;font-weight:700;color:var(--dark)">🔘 Selección múltiple</span>
+    <span style="background:#fce8ff;border:1.5px solid #ce93d8;border-radius:99px;padding:6px 14px;font-size:.82rem;font-weight:700;color:var(--dark)">🔃 Ordena el recorrido</span>
+  </div>
+  <button class="btn btn-primary" onclick="goScreen(1)">🚀 Comenzar</button>
+</div>
+
+<!-- SCREEN 1: FILL BLANKS -->
+<div id="screen-1" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 1 DE 6</div>
+    <div class="section-title">✍️ Completa las oraciones</div>
+    <div class="section-desc">Escribe la palabra correcta en cada espacio en blanco.</div>
+  </div>
+  <div class="hint-chip">💡 Pista: observa bien cada descripción</div>
+  <div id="fill-container"></div>
+  <div class="nav-row">
+    <button class="btn btn-success" onclick="checkFill()">✅ Verificar respuestas</button>
+    <button class="btn btn-primary" id="fill-next" style="display:none" onclick="goScreen(2)">Siguiente actividad →</button>
+  </div>
+</div>
+
+<!-- SCREEN 2: MATCH -->
+<div id="screen-2" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 2 DE 6</div>
+    <div class="section-title">🔗 Relaciona columnas</div>
+    <div class="section-desc">Selecciona la definición correcta para cada órgano.</div>
+  </div>
+  <div class="card">
+    <div class="match-grid" id="match-container"></div>
+  </div>
+  <div class="nav-row">
+    <button class="btn btn-success" onclick="checkMatch()">✅ Verificar</button>
+    <button class="btn btn-primary" id="match-next" style="display:none" onclick="goScreen(3)">Siguiente actividad →</button>
+  </div>
+</div>
+
+<!-- SCREEN 3: TRUE/FALSE -->
+<div id="screen-3" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 3 DE 6</div>
+    <div class="section-title">✅ Verdadero o Falso</div>
+    <div class="section-desc">Decide si cada afirmación es verdadera o falsa.</div>
+  </div>
+  <div id="tf-container"></div>
+  <div class="nav-row">
+    <button class="btn btn-success" onclick="checkTF()">✅ Verificar</button>
+    <button class="btn btn-primary" id="tf-next" style="display:none" onclick="goScreen(4)">Siguiente actividad →</button>
+  </div>
+</div>
+
+<!-- SCREEN 4: MULTIPLE CHOICE -->
+<div id="screen-4" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 4 DE 6</div>
+    <div class="section-title">🔘 Selección múltiple</div>
+    <div class="section-desc">Elige la respuesta correcta para cada pregunta.</div>
+  </div>
+  <div id="mc-container"></div>
+  <div class="nav-row">
+    <button class="btn btn-success" onclick="checkMC()">✅ Verificar</button>
+    <button class="btn btn-primary" id="mc-next" style="display:none" onclick="goScreen(5)">Siguiente actividad →</button>
+  </div>
+</div>
+
+<!-- SCREEN 5: ORDER -->
+<div id="screen-5" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 5 DE 6</div>
+    <div class="section-title">🔃 Ordena el recorrido del aire</div>
+    <div class="section-desc">Arrastra los elementos para ordenar el recorrido del aire en el cuerpo.</div>
+  </div>
+  <div class="card">
+    <div id="order-container"></div>
+    <div class="order-feedback" id="order-feedback"></div>
+  </div>
+  <div class="nav-row">
+    <button class="btn btn-success" onclick="checkOrder()">✅ Verificar orden</button>
+    <button class="btn btn-primary" id="order-next" style="display:none" onclick="goScreen(6)">Siguiente actividad →</button>
+  </div>
+</div>
+
+<!-- SCREEN 6: CURIOSITIES -->
+<div id="screen-6" class="screen">
+  <div class="section-header">
+    <div class="section-number">ACTIVIDAD 6 DE 6</div>
+    <div class="section-title">🌟 Datos curiosos</div>
+    <div class="section-desc">¡Descubre datos increíbles sobre tu sistema respiratorio!</div>
+  </div>
+  <div class="curio-grid">
+    <div class="curio-card curio-1">
+      <span class="curio-icon">😮‍💨</span>
+      <div class="curio-number" style="color:var(--blue)">20,000</div>
+      <div class="curio-text">veces al día respiramos sin darnos cuenta</div>
+    </div>
+    <div class="curio-card curio-2">
+      <span class="curio-icon">🫧</span>
+      <div class="curio-number" style="color:var(--purple)">300M+</div>
+      <div class="curio-text">alvéolos tiene cada pulmón para el intercambio de gases</div>
+    </div>
+    <div class="curio-card curio-3">
+      <span class="curio-icon">💨</span>
+      <div class="curio-number" style="color:#d84315">21%</div>
+      <div class="curio-text">de oxígeno contiene el aire que respiramos</div>
+    </div>
+    <div class="curio-card curio-4">
+      <span class="curio-icon">🫁</span>
+      <div class="curio-number" style="color:var(--green)">4-6 L</div>
+      <div class="curio-text">es la capacidad pulmonar aproximada de tus pulmones</div>
+    </div>
+  </div>
+  <div class="card" style="background:linear-gradient(135deg,#e0f7ff,#f3e5f5);text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">🧠</div>
+    <div style="font-weight:800;font-size:1.05rem;color:var(--dark);margin-bottom:6px">¿Sabías que…?</div>
+    <div style="font-size:.95rem;color:#444;line-height:1.6">El aire contiene un <strong>0.04%</strong> de dióxido de carbono, pero nosotros exhalamos aproximadamente un <strong>4%</strong>. ¡Tus pulmones trabajan muy duro para mantener tu cuerpo saludable!</div>
+  </div>
+  <div class="card" style="background:linear-gradient(135deg,#fff8e1,#ffe082);text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">🏃</div>
+    <div style="font-weight:800;font-size:1.05rem;color:var(--dark);margin-bottom:8px">Compara tu respiración</div>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
+      <div style="background:rgba(255,255,255,.7);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-size:1.5rem">🧘</div>
+        <div style="font-weight:800;font-size:.85rem;color:var(--dark)">En reposo</div>
+        <div style="font-size:.8rem;color:#555;margin-top:4px">12-20 respiraciones por minuto. Lenta y profunda.</div>
+      </div>
+      <div style="font-size:1.5rem">⚡</div>
+      <div style="background:rgba(255,255,255,.7);border-radius:12px;padding:12px;text-align:center">
+        <div style="font-size:1.5rem">🏃</div>
+        <div style="font-weight:800;font-size:.85rem;color:var(--dark)">Después de correr</div>
+        <div style="font-size:.8rem;color:#555;margin-top:4px">Rápida y agitada. Tu cuerpo necesita más oxígeno.</div>
+      </div>
+    </div>
+  </div>
+  <div class="nav-row">
+    <button class="btn btn-purple" onclick="goScreen(7)">Ver mis resultados 🏆</button>
+  </div>
+</div>
+
+<!-- SCREEN 7: RESULTS -->
+<div id="screen-7" class="screen">
+  <div class="section-header">
+    <div class="section-number">🏁 FIN DEL JUEGO</div>
+    <div class="section-title">Tus Resultados</div>
+  </div>
+  <div class="card text-center">
+    <div id="result-circle" class="result-circle"></div>
+    <div id="result-msg" class="result-msg"></div>
+    <div id="result-detail" class="result-detail"></div>
+    <div class="result-bar-wrap"><div id="result-bar" class="result-bar"></div></div>
+    <div id="result-badges" class="result-badges"></div>
+  </div>
+  <div class="card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9)">
+    <div style="font-weight:800;font-size:1rem;color:var(--dark);margin-bottom:12px;text-align:center">🫁 ¡Cuida tus pulmones!</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:.9rem;font-weight:600;color:#333"><span>🏃</span> Haz ejercicio regularmente</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:.9rem;font-weight:600;color:#333"><span>🚭</span> Evita el humo del tabaco y la contaminación</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:.9rem;font-weight:600;color:#333"><span>🥗</span> Come sano y mantente hidratado</div>
+    </div>
+  </div>
+  <div class="nav-row">
+    <button class="btn btn-primary" onclick="restartGame()">🔄 Jugar de nuevo</button>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// DATA
+// =========================================================
+const fillData=[
+  {sentence:"El aire entra al cuerpo principalmente por la _______.",blank:["nariz"],hint:"Órgano que filtra, calienta y humedece el aire"},
+  {sentence:"La _______ conecta la nariz y la boca con la laringe.",blank:["faringe"],hint:"Conducto que une la nariz/boca con la laringe"},
+  {sentence:"La _______ contiene las cuerdas vocales que producen la voz.",blank:["laringe"],hint:"Órgano relacionado con la voz"},
+  {sentence:"La _______ es un tubo con anillos de cartílago que lleva el aire hasta los bronquios.",blank:["tráquea","traquea"],hint:"Tubo con anillos de cartílago"},
+  {sentence:"Los _______ se dividen en dos y llevan el aire a cada pulmón.",blank:["bronquios"],hint:"Se dividen en dos ramas"},
+  {sentence:"Los _______ son órganos esponjosos donde el oxígeno pasa a la sangre.",blank:["pulmones"],hint:"Órganos principales de la respiración"},
+  {sentence:"Los _______ son pequeños sacos donde ocurre el intercambio de gases con la sangre.",blank:["alvéolos","alveólos"],hint:"Pequeñísimos sacos de aire"},
+  {sentence:"Respiramos aproximadamente _______ veces al día.",blank:["20000","20.000","veinte mil"],hint:"Un número muy grande"},
+  {sentence:"El aire que respiramos contiene un _______ % de oxígeno.",blank:["21","21%"],hint:"Poco más de un quinto"},
+  {sentence:"La capacidad pulmonar es de entre _______ y 6 litros de aire.",blank:["4","cuatro"],hint:"Entre 4 y 6 litros"}
+];
+
+const matchData=[
+  {term:"Nariz",emoji:"👃",answer:"Filtra y humedece el aire"},
+  {term:"Faringe",emoji:"🔗",answer:"Conecta nariz y boca con la laringe"},
+  {term:"Laringe",emoji:"🎙️",answer:"Produce la voz"},
+  {term:"Tráquea",emoji:"🌀",answer:"Lleva el aire a los bronquios"},
+  {term:"Bronquios",emoji:"🌿",answer:"Se dividen en dos ramas"},
+  {term:"Pulmones",emoji:"🫁",answer:"Órganos donde llega el oxígeno"},
+  {term:"Alvéolos",emoji:"🫧",answer:"Intercambio de gases"}
+];
+
+const tfData=[
+  {s:"Los pulmones son órganos esponjosos.",answer:true},
+  {s:"La tráquea transporta sangre por el cuerpo.",answer:false},
+  {s:"Los alvéolos realizan el intercambio de gases.",answer:true},
+  {s:"Respiramos aproximadamente 20 000 veces al día.",answer:true},
+  {s:"La faringe contiene las cuerdas vocales.",answer:false},
+  {s:"Los bronquios se dividen en dos y llevan aire a cada pulmón.",answer:true},
+  {s:"El aire contiene un 21% de oxígeno.",answer:true},
+  {s:"La nariz solo tiene la función de oler.",answer:false},
+  {s:"Los pulmones tienen más de 300 millones de alvéolos.",answer:true},
+  {s:"La capacidad pulmonar es de entre 4 y 6 litros.",answer:true}
+];
+
+const mcData=[
+  {q:"¿Dónde ocurre el intercambio de gases?",opts:["Tráquea","Bronquios","Alvéolos","Faringe"],answer:2},
+  {q:"¿Cuál órgano filtra, calienta y humedece el aire?",opts:["Laringe","Bronquios","Faringe","Nariz"],answer:3},
+  {q:"¿Qué estructura contiene anillos de cartílago?",opts:["Tráquea","Alvéolos","Pulmones","Faringe"],answer:0},
+  {q:"¿Cuántas veces al día respiramos aproximadamente?",opts:["2 000","5 000","20 000","100 000"],answer:2},
+  {q:"¿Qué porcentaje de oxígeno tiene el aire que respiramos?",opts:["4%","10%","21%","50%"],answer:2},
+  {q:"¿Cuál es la función de la laringe?",opts:["Filtrar el aire","Producir la voz","Intercambiar gases","Transportar sangre"],answer:1},
+  {q:"¿Cómo se llaman los pequeños sacos de aire en los pulmones?",opts:["Bronquios","Alvéolos","Capilares","Vellosidades"],answer:1},
+  {q:"¿Qué rango tiene la capacidad pulmonar?",opts:["1-2 litros","4-6 litros","8-10 litros","12-15 litros"],answer:1},
+  {q:"¿Cuántos bronquios principales hay?",opts:["Uno","Dos","Tres","Cuatro"],answer:1},
+  {q:"¿Cuál órgano conecta la nariz y la boca con la laringe?",opts:["Tráquea","Alvéolo","Faringe","Bronquio"],answer:2}
+];
+
+const orderData=[
+  {label:"Nariz",emoji:"👃"},
+  {label:"Faringe",emoji:"🔗"},
+  {label:"Laringe",emoji:"🎙️"},
+  {label:"Tráquea",emoji:"🌀"},
+  {label:"Bronquios",emoji:"🌿"},
+  {label:"Pulmones",emoji:"🫁"},
+  {label:"Alvéolos",emoji:"🫧"}
+];
+
+// =========================================================
+// STATE
+// =========================================================
+let score=0;
+let maxScore=0;
+let screensScored={};
+let currentDrag=null;
+
+// =========================================================
+// NAVIGATION
+// =========================================================
+function goScreen(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const t=document.getElementById(n===0?'screen-intro':'screen-'+n);
+  if(t){t.classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}
+  updateProgress(n);
+  if(n===1&&!document.getElementById('fill-container').hasChildNodes())buildFill();
+  if(n===2&&!document.getElementById('match-container').hasChildNodes())buildMatch();
+  if(n===3&&!document.getElementById('tf-container').hasChildNodes())buildTF();
+  if(n===4&&!document.getElementById('mc-container').hasChildNodes())buildMC();
+  if(n===5&&!document.getElementById('order-container').hasChildNodes())buildOrder();
+  if(n===7)showResults();
+}
+
+function updateProgress(n){
+  const labels=['Inicio','Completa oraciones','Relaciona columnas','Verdadero/Falso','Selección múltiple','Ordena recorrido','Datos curiosos','Resultados'];
+  document.getElementById('progress-label').textContent=n===0?'¡Bienvenido!':(n===7?'Resultados':'Actividad '+n+'/6');
+  const pct=n===0?0:n===7?100:Math.round((n/6)*100);
+  document.getElementById('progress-fill').style.width=pct+'%';
+  document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+}
+
+// =========================================================
+// BUILD FILL
+// =========================================================
+function buildFill(){
+  const c=document.getElementById('fill-container');
+  fillData.forEach((item,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    const parts=item.sentence.split('_______');
+    div.innerHTML=`<div class="fill-sentence">
+      <span style="display:inline-block;background:var(--dark);color:#fff;border-radius:99px;padding:2px 10px;font-size:.75rem;font-weight:800;margin-right:6px">${i+1}</span>
+      ${parts[0]}<input class="fill-input" id="fill-${i}" type="text" placeholder="…" autocomplete="off">${parts[1]||''}
+    </div>
+    <div class="fill-feedback" id="fill-fb-${i}"></div>`;
+    c.appendChild(div);
+  });
+}
+
+function checkFill(){
+  if(screensScored[1])return;
+  let pts=0;
+  fillData.forEach((item,i)=>{
+    const inp=document.getElementById('fill-'+i);
+    const fb=document.getElementById('fill-fb-'+i);
+    const val=inp.value.trim().toLowerCase();
+    const ok=item.blank.some(b=>b.toLowerCase()===val);
+    inp.classList.remove('correct','wrong');
+    inp.classList.add(ok?'correct':'wrong');
+    fb.className='fill-feedback '+(ok?'ok':'no');
+    fb.textContent=ok?'✅ ¡Correcto!':'❌ Intenta nuevamente. Pista: '+item.hint;
+    if(ok)pts++;
+    inp.disabled=true;
+  });
+  score+=pts;
+  screensScored[1]=true;
+  maxScore+=fillData.length;
+  document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+  document.getElementById('fill-next').style.display='inline-block';
+}
+
+// =========================================================
+// BUILD MATCH
+// =========================================================
+function buildMatch(){
+  const c=document.getElementById('match-container');
+  const allAnswers=matchData.map(m=>m.answer);
+  const shuffled=[...allAnswers].sort(()=>Math.random()-.5);
+  matchData.forEach((item,i)=>{
+    const termDiv=document.createElement('div');
+    termDiv.className='match-term';
+    termDiv.innerHTML=`<span>${item.emoji}</span>${item.term}`;
+    const selDiv=document.createElement('div');
+    const sel=document.createElement('select');
+    sel.className='match-select';
+    sel.id='match-'+i;
+    const opt0=document.createElement('option');
+    opt0.value='';opt0.textContent='Selecciona…';
+    sel.appendChild(opt0);
+    allAnswers.forEach(a=>{
+      const opt=document.createElement('option');
+      opt.value=a;opt.textContent=a;
+      sel.appendChild(opt);
+    });
+    selDiv.appendChild(sel);
+    c.appendChild(termDiv);
+    c.appendChild(selDiv);
+  });
+}
+
+function checkMatch(){
+  if(screensScored[2])return;
+  let pts=0;
+  matchData.forEach((item,i)=>{
+    const sel=document.getElementById('match-'+i);
+    const ok=sel.value===item.answer;
+    sel.classList.remove('correct','wrong');
+    sel.classList.add(ok?'correct':'wrong');
+    if(ok)pts++;
+    sel.disabled=true;
+  });
+  score+=pts;
+  screensScored[2]=true;
+  maxScore+=matchData.length;
+  document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+  document.getElementById('match-next').style.display='inline-block';
+}
+
+// =========================================================
+// BUILD TF
+// =========================================================
+function buildTF(){
+  const c=document.getElementById('tf-container');
+  tfData.forEach((item,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    div.innerHTML=`
+      <div class="tf-statement">
+        <span style="display:inline-block;background:var(--purple);color:#fff;border-radius:99px;padding:2px 10px;font-size:.75rem;font-weight:800;margin-right:6px">${i+1}</span>
+        ${item.s}
+      </div>
+      <div class="tf-btns">
+        <button class="tf-btn" id="tf-${i}-true" onclick="selectTF(${i},true)">✅ Verdadero</button>
+        <button class="tf-btn" id="tf-${i}-false" onclick="selectTF(${i},false)">❌ Falso</button>
+      </div>
+      <div class="tf-feedback" id="tf-fb-${i}"></div>`;
+    c.appendChild(div);
+  });
+}
+
+const tfSelected={};
+function selectTF(i,val){
+  if(screensScored[3])return;
+  tfSelected[i]=val;
+  document.getElementById('tf-'+i+'-true').classList.toggle('sel-true',val===true);
+  document.getElementById('tf-'+i+'-true').classList.toggle('sel-false',false);
+  document.getElementById('tf-'+i+'-false').classList.toggle('sel-false',val===false);
+  document.getElementById('tf-'+i+'-false').classList.toggle('sel-true',false);
+}
+
+function checkTF(){
+  if(screensScored[3])return;
+  let pts=0;
+  tfData.forEach((item,i)=>{
+    const sel=tfSelected[i];
+    const ok=sel===item.answer;
+    const fb=document.getElementById('tf-fb-'+i);
+    const btnT=document.getElementById('tf-'+i+'-true');
+    const btnF=document.getElementById('tf-'+i+'-false');
+    if(sel===undefined){fb.className='tf-feedback no';fb.textContent='⚠️ No respondiste esta pregunta.';return;}
+    fb.className='tf-feedback '+(ok?'ok':'no');
+    fb.textContent=ok?'✅ ¡Correcto!':'❌ La respuesta correcta es: '+(item.answer?'Verdadero':'Falso');
+    if(item.answer){btnT.classList.add('correct');if(!ok)btnF.classList.add('wrong');}
+    else{btnF.classList.add('correct');if(!ok)btnT.classList.add('wrong');}
+    btnT.disabled=true;btnF.disabled=true;
+    if(ok)pts++;
+  });
+  score+=pts;
+  screensScored[3]=true;
+  maxScore+=tfData.length;
+  document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+  document.getElementById('tf-next').style.display='inline-block';
+}
+
+// =========================================================
+// BUILD MC
+// =========================================================
+function buildMC(){
+  const c=document.getElementById('mc-container');
+  mcData.forEach((item,i)=>{
+    const div=document.createElement('div');
+    div.className='card';
+    let optsHTML=item.opts.map((o,j)=>`<button class="mc-opt" id="mc-${i}-${j}" onclick="selectMC(${i},${j})">${String.fromCharCode(65+j)}) ${o}</button>`).join('');
+    div.innerHTML=`<div class="mc-question"><span style="display:inline-block;background:var(--orange);color:#fff;border-radius:99px;padding:2px 10px;font-size:.75rem;font-weight:800;margin-right:6px">${i+1}</span>${item.q}</div>
+    <div class="mc-options">${optsHTML}</div>
+    <div class="mc-feedback" id="mc-fb-${i}"></div>`;
+    c.appendChild(div);
+  });
+}
+
+const mcSelected={};
+function selectMC(qi,oi){
+  if(screensScored[4])return;
+  mcData[qi].opts.forEach((_,j)=>{
+    document.getElementById('mc-'+qi+'-'+j).classList.remove('selected');
+  });
+  document.getElementById('mc-'+qi+'-'+oi).classList.add('selected');
+  mcSelected[qi]=oi;
+}
+
+function checkMC(){
+  if(screensScored[4])return;
+  let pts=0;
+  mcData.forEach((item,i)=>{
+    const sel=mcSelected[i];
+    const fb=document.getElementById('mc-fb-'+i);
+    if(sel===undefined){fb.className='mc-feedback no';fb.textContent='⚠️ No respondiste esta pregunta.';return;}
+    const ok=sel===item.answer;
+    fb.className='mc-feedback '+(ok?'ok':'no');
+    fb.textContent=ok?'✅ ¡Correcto!':'❌ La respuesta correcta es: '+String.fromCharCode(65+item.answer)+') '+item.opts[item.answer];
+    item.opts.forEach((_,j)=>{
+      const btn=document.getElementById('mc-'+i+'-'+j);
+      if(j===item.answer)btn.classList.add('correct');
+      else if(j===sel&&!ok)btn.classList.add('wrong');
+      btn.disabled=true;
+    });
+    if(ok)pts++;
+  });
+  score+=pts;
+  screensScored[4]=true;
+  maxScore+=mcData.length;
+  document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+  document.getElementById('mc-next').style.display='inline-block';
+}
+
+// =========================================================
+// BUILD ORDER (Drag & Drop)
+// =========================================================
+let orderItems=[];
+function buildOrder(){
+  orderItems=[...orderData].sort(()=>Math.random()-.5);
+  renderOrder();
+}
+
+function renderOrder(){
+  const c=document.getElementById('order-container');
+  c.innerHTML='';
+  orderItems.forEach((item,i)=>{
+    const div=document.createElement('div');
+    div.className='order-item';
+    div.draggable=true;
+    div.dataset.idx=i;
+    div.innerHTML=`<div class="order-num">${i+1}</div><span class="order-emoji">${item.emoji}</span><span>${item.label}</span><span style="margin-left:auto;color:#b0c4d8;font-size:1.2rem">⠿</span>`;
+    div.addEventListener('dragstart',onDragStart);
+    div.addEventListener('dragover',onDragOver);
+    div.addEventListener('drop',onDrop);
+    div.addEventListener('dragend',onDragEnd);
+    // Touch support
+    div.addEventListener('touchstart',onTouchStart,{passive:true});
+    div.addEventListener('touchmove',onTouchMove,{passive:false});
+    div.addEventListener('touchend',onTouchEnd);
+    c.appendChild(div);
+  });
+}
+
+function onDragStart(e){currentDrag=this;this.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function onDragOver(e){e.preventDefault();this.classList.add('drag-over');}
+function onDrop(e){
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  if(currentDrag&&currentDrag!==this){
+    const from=parseInt(currentDrag.dataset.idx);
+    const to=parseInt(this.dataset.idx);
+    [orderItems[from],orderItems[to]]=[orderItems[to],orderItems[from]];
+    renderOrder();
+  }
+}
+function onDragEnd(){this.classList.remove('dragging');document.querySelectorAll('.order-item').forEach(el=>el.classList.remove('drag-over'));}
+
+let touchStartIdx=null,touchClone=null,touchStartY=0;
+function onTouchStart(e){
+  touchStartIdx=parseInt(this.dataset.idx);
+  touchStartY=e.touches[0].clientY;
+}
+function onTouchMove(e){e.preventDefault();}
+function onTouchEnd(e){
+  const endY=e.changedTouches[0].clientY;
+  const items=document.querySelectorAll('.order-item');
+  let targetIdx=null;
+  items.forEach(el=>{
+    const rect=el.getBoundingClientRect();
+    if(endY>=rect.top&&endY<=rect.bottom)targetIdx=parseInt(el.dataset.idx);
+  });
+  if(targetIdx!==null&&targetIdx!==touchStartIdx){
+    [orderItems[touchStartIdx],orderItems[targetIdx]]=[orderItems[targetIdx],orderItems[touchStartIdx]];
+    renderOrder();
+  }
+}
+
+function checkOrder(){
+  if(screensScored[5])return;
+  const fb=document.getElementById('order-feedback');
+  const correct=orderItems.every((item,i)=>item.label===orderData[i].label);
+  fb.className='order-feedback '+(correct?'ok':'no');
+  if(correct){
+    fb.textContent='🎉 ¡Perfecto! Conoces el recorrido del aire.';
+    score+=10;
+    document.getElementById('progress-score').textContent='🏆 '+score+' pts';
+  } else {
+    fb.textContent='❌ No es el orden correcto. El recorrido correcto es: Nariz → Faringe → Laringe → Tráquea → Bronquios → Pulmones → Alvéolos';
+  }
+  screensScored[5]=true;
+  maxScore+=10;
+  document.getElementById('order-next').style.display='inline-block';
+}
+
+// =========================================================
+// RESULTS
+// =========================================================
+function showResults(){
+  const total=maxScore||1;
+  const pct=Math.round((score/total)*100);
+  // circle
+  const circle=document.getElementById('result-circle');
+  let bg,emoji;
+  if(pct>=90){bg='linear-gradient(135deg,#66BB6A,#2e7d32)';emoji='🌟';}
+  else if(pct>=70){bg='linear-gradient(135deg,#00B7D8,#003366)';emoji='👏';}
+  else if(pct>=50){bg='linear-gradient(135deg,#FF9800,#e65100)';emoji='💪';}
+  else{bg='linear-gradient(135deg,#8E44AD,#6c1f8c)';emoji='📚';}
+  circle.style.background=bg;
+  circle.innerHTML=`<div style="font-size:2.8rem">${emoji}</div><div style="font-size:1.6rem;font-weight:900;color:#fff">${score}</div><div class="result-pct" style="color:rgba(255,255,255,.85)">${pct}%</div>`;
+  // msg
+  const msg=document.getElementById('result-msg');
+  const detail=document.getElementById('result-detail');
+  if(pct>=90){msg.textContent='🌟 ¡Excelente trabajo!';detail.textContent='¡Eres un experto del sistema respiratorio! Obtuviste '+score+' de '+total+' puntos posibles.';}
+  else if(pct>=70){msg.textContent='👏 ¡Muy bien!';detail.textContent='Tienes un buen conocimiento del sistema respiratorio. Obtuviste '+score+' de '+total+' puntos.';}
+  else if(pct>=50){msg.textContent='💪 ¡Sigue practicando!';detail.textContent='Vas por buen camino. Repasa y volverás a intentarlo. Obtuviste '+score+' de '+total+' puntos.';}
+  else{msg.textContent='📚 ¡Vuelve a repasar!';detail.textContent='Repasa los contenidos y vuelve a intentarlo. Obtuviste '+score+' de '+total+' puntos.';}
+  // bar
+  const bar=document.getElementById('result-bar');
+  bar.style.width='0%';
+  bar.style.background=pct>=70?'linear-gradient(90deg,var(--green),#2e7d32)':'linear-gradient(90deg,var(--orange),#e65100)';
+  setTimeout(()=>{bar.style.width=pct+'%';},300);
+  // badges
+  const badges=document.getElementById('result-badges');
+  const earned=[];
+  if(screensScored[1])earned.push({t:'✍️ Completó oraciones',c:'#e0f7ff',bc:var_blue});
+  if(screensScored[2])earned.push({t:'🔗 Relacionó columnas',c:'#f3e5f5',bc:'#8E44AD'});
+  if(screensScored[3])earned.push({t:'✅ Evaluó V/F',c:'#e8f5e9',bc:'#66BB6A'});
+  if(screensScored[4])earned.push({t:'🔘 Respondió preguntas',c:'#fff8e1',bc:'#FF9800'});
+  if(screensScored[5])earned.push({t:'🔃 Ordenó recorrido',c:'#fce4ec',bc:'#e91e63'});
+  badges.innerHTML=earned.map(b=>`<span class="result-badge" style="background:${b.c};border:1.5px solid ${b.bc};color:${b.bc}">${b.t}</span>`).join('');
+}
+
+const var_blue='#00B7D8';
+
+function restartGame(){
+  score=0;maxScore=0;screensScored={};tfSelected;
+  Object.keys(tfSelected).forEach(k=>delete tfSelected[k]);
+  Object.keys(mcSelected).forEach(k=>delete mcSelected[k]);
+  document.getElementById('fill-container').innerHTML='';
+  document.getElementById('match-container').innerHTML='';
+  document.getElementById('tf-container').innerHTML='';
+  document.getElementById('mc-container').innerHTML='';
+  document.getElementById('order-container').innerHTML='';
+  document.getElementById('order-feedback').textContent='';
+  document.getElementById('fill-next').style.display='none';
+  document.getElementById('match-next').style.display='none';
+  document.getElementById('tf-next').style.display='none';
+  document.getElementById('mc-next').style.display='none';
+  document.getElementById('order-next').style.display='none';
+  document.getElementById('progress-score').textContent='🏆 0 pts';
+  goScreen(0);
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(r=>console.log('SW registrado:',r.scope))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
+</script>
+</body>
+</html>
